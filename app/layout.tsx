@@ -13,20 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Modern Landing Page",
+  title: "Taste with Your Eyes",
   description:
-    "Transform your ideas into reality with our modern platform. Experience the future of innovation today.",
+    "Upload a photo of a restaurant menu and get an interactive, visual menu in seconds.",
   openGraph: {
-    title: "Modern Landing Page",
+    title: "Taste with Your Eyes",
     description:
-      "Transform your ideas into reality with our modern platform. Experience the future of innovation today.",
+      "Upload a photo of a restaurant menu and get an interactive, visual menu in seconds.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Modern Landing Page",
+    title: "Taste with Your Eyes",
     description:
-      "Transform your ideas into reality with our modern platform. Experience the future of innovation today.",
+      "Upload a photo of a restaurant menu and get an interactive, visual menu in seconds.",
   },
 };
 
