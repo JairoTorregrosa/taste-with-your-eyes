@@ -1,6 +1,8 @@
 "use client";
 
 import type { MenuPayload } from "@/src/lib/validation";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, RefreshCw, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -10,6 +12,26 @@ type Props = {
   savedId?: string | null;
 };
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
 export function MenuView({ menu, onReset, savedId }: Props) {
   const totalItems = menu.categories.reduce(
     (sum, cat) => sum + cat.items.length,
@@ -17,23 +39,63 @@ export function MenuView({ menu, onReset, savedId }: Props) {
   );
 
   return (
-    <div className="w-full space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-zinc-50/50 px-6 py-6 shadow-sm transition-all duration-300 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-950/50">
+    <motion.div
+      className="w-full space-y-8"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+    >
+      {/* Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-white via-white to-emerald-50/30 px-6 py-6 shadow-lg dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-emerald-950/20"
+      >
+        {/* Decorative background */}
+        <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-gradient-to-br from-emerald-500/10 to-transparent blur-3xl" />
+
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 space-y-3">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-2 inline-flex items-center gap-2"
+              >
+                <span className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <Sparkles className="h-3  w-3" />
+                  AI Generated
+                </span>
+              </motion.div>
+              <motion.h1
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl"
+              >
                 {menu.restaurantName || "Your Menu"}
-              </h1>
+              </motion.h1>
               {totalItems > 0 && (
-                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"
+                >
                   {totalItems} {totalItems === 1 ? "item" : "items"} across{" "}
                   {menu.categories.length}{" "}
                   {menu.categories.length === 1 ? "category" : "categories"}
-                </p>
+                </motion.p>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex flex-wrap items-center gap-2.5"
+            >
               {menu.branding?.primaryColor && (
                 <ColorSwatch
                   label="Primary"
@@ -44,86 +106,116 @@ export function MenuView({ menu, onReset, savedId }: Props) {
                 <ColorSwatch label="Accent" value={menu.branding.accentColor} />
               )}
               {savedId && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-all dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/40">
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/40"
+                >
+                  <Check className="h-3.5 w-3.5" />
                   Saved
-                </span>
+                </motion.span>
               )}
-            </div>
+            </motion.div>
           </div>
-          <button
+          <motion.button
             type="button"
             onClick={onReset}
-            className="group flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="group flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 shadow-sm transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
           >
-            <svg
-              className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Start over
-          </button>
+            <RefreshCw className="h-4 w-4 transition-transform group-hover:-rotate-45" />
+            New menu
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Categories and Dishes */}
+      <motion.div
+        className="grid gap-10 lg:grid-cols-2"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {menu.categories.map((cat, catIndex) => (
-          <div
+          <motion.div
             key={cat.name}
             className="flex flex-col gap-6"
-            style={{
-              animationDelay: `${catIndex * 100}ms`,
-            }}
+            variants={itemVariants}
           >
+            {/* Category Header */}
             <div className="flex items-center gap-4 px-1">
               <div className="flex items-center gap-3">
-                <div
-                  className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500"
-                  aria-hidden
+                <motion.div
+                  className="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Number.POSITIVE_INFINITY,
+                    delay: catIndex * 0.2,
+                  }}
                 />
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
                   {cat.name}
                 </h2>
               </div>
               <div className="h-px flex-1 rounded-full bg-gradient-to-r from-zinc-200 via-zinc-300/50 to-transparent dark:from-zinc-800 dark:via-zinc-700/50" />
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                 {cat.items.length}
               </span>
             </div>
 
+            {/* Dish Cards */}
             <div className="grid gap-5">
               {cat.items.map((item, itemIndex) => (
                 <DishCard
                   key={`${item.name}-${itemIndex}`}
                   {...item}
                   index={itemIndex}
+                  categoryIndex={catIndex}
                 />
               ))}
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
-    </div>
+      </motion.div>
+
+      {/* Generate Another CTA */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1 }}
+        className="flex justify-center pt-4"
+      >
+        <motion.button
+          onClick={onReset}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          animate={{
+            boxShadow: [
+              "0 0 0 0 rgba(16, 185, 129, 0)",
+              "0 0 0 8px rgba(16, 185, 129, 0.1)",
+              "0 0 0 0 rgba(16, 185, 129, 0)",
+            ],
+          }}
+          transition={{
+            boxShadow: {
+              duration: 2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            },
+          }}
+          className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-600 hover:to-emerald-700 hover:shadow-emerald-500/40"
+        >
+          <RefreshCw className="h-5 w-5 transition-transform group-hover:rotate-180" />
+          Generate another menu
+        </motion.button>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -134,6 +226,7 @@ const DishCard = ({
   imageUrl,
   confidence,
   index = 0,
+  categoryIndex = 0,
 }: {
   name: string;
   description?: string;
@@ -141,30 +234,48 @@ const DishCard = ({
   imageUrl?: string;
   confidence?: number;
   index?: number;
+  categoryIndex?: number;
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   return (
-    <article
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all duration-500 hover:border-zinc-300 hover:shadow-xl dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:border-zinc-700"
-      style={{
-        animation: `fadeInUp 0.6s ease-out ${index * 50}ms both`,
+    <motion.article
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.5,
+        delay: categoryIndex * 0.1 + index * 0.05,
+        ease: [0.22, 1, 0.36, 1],
       }}
+      whileHover={{
+        y: -4,
+        boxShadow: "0 20px 40px -12px rgba(0,0,0,0.15)",
+      }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/80 dark:hover:border-zinc-700"
     >
       {imageUrl && !imageError ? (
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-zinc-100 to-zinc-200/50 dark:from-zinc-800 dark:to-zinc-900/50">
-          {!imageLoaded && (
-            <div className="absolute inset-0 animate-pulse bg-zinc-200 dark:bg-zinc-800" />
-          )}
+          <AnimatePresence>
+            {!imageLoaded && (
+              <motion.div
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 animate-pulse bg-zinc-200 dark:bg-zinc-800"
+              />
+            )}
+          </AnimatePresence>
 
-          <div
+          <motion.div
             className={`relative h-full w-full transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"
               }`}
           >
-            <ProgressiveImage
+            <Image
               src={imageUrl}
               alt={name}
+              fill
+              unoptimized
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
               onLoad={() => setImageLoaded(true)}
               onError={() => {
@@ -172,12 +283,17 @@ const DishCard = ({
                 setImageLoaded(false);
               }}
             />
-          </div>
+          </motion.div>
 
           {price && (
-            <div className="absolute top-4 right-4 overflow-hidden rounded-full bg-white/95 px-3.5 py-1.5 text-sm font-bold text-zinc-900 shadow-lg backdrop-blur-sm ring-1 ring-zinc-200/50 transition-all duration-300 group-hover:scale-105 dark:bg-zinc-900/95 dark:text-white dark:ring-zinc-700/50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+              className="absolute top-4 right-4 overflow-hidden rounded-full bg-white/95 px-3.5 py-1.5 text-sm font-bold text-zinc-900 shadow-lg backdrop-blur-sm ring-1 ring-zinc-200/50 transition-transform duration-300 group-hover:scale-105 dark:bg-zinc-900/95 dark:text-white dark:ring-zinc-700/50"
+            >
               {price}
-            </div>
+            </motion.div>
           )}
 
           {confidence !== undefined && confidence < 0.8 && (
@@ -200,6 +316,8 @@ const DishCard = ({
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              role="img"
+              aria-label="Image placeholder"
             >
               <path
                 strokeLinecap="round"
@@ -213,7 +331,7 @@ const DishCard = ({
       )}
 
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <h3 className="mb-2 text-xl font-bold tracking-tight text-zinc-900 transition-colors group-hover:text-zinc-700 dark:text-white dark:group-hover:text-zinc-100 sm:text-2xl">
+        <h3 className="mb-2 text-xl font-bold tracking-tight text-zinc-900 transition-colors group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-400 sm:text-2xl">
           {name}
         </h3>
         {description && (
@@ -222,37 +340,15 @@ const DishCard = ({
           </p>
         )}
       </div>
-    </article>
+    </motion.article>
   );
 };
 
-const ProgressiveImage = ({
-  src,
-  alt,
-  className = "",
-  onLoad,
-  onError,
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-  onLoad?: () => void;
-  onError?: () => void;
-}) => (
-  <Image
-    src={src}
-    alt={alt}
-    fill
-    unoptimized
-    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-    className={className}
-    onLoad={onLoad}
-    onError={onError}
-  />
-);
-
 const ColorSwatch = ({ label, value }: { label: string; value: string }) => (
-  <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+  <motion.span
+    whileHover={{ scale: 1.05 }}
+    className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+  >
     <span
       aria-hidden
       className="h-4 w-4 rounded-full border-2 border-zinc-200 shadow-sm dark:border-zinc-700"
@@ -260,5 +356,5 @@ const ColorSwatch = ({ label, value }: { label: string; value: string }) => (
     />
     <span className="font-medium">{label}</span>
     <span className="font-mono text-[10px] opacity-70">{value}</span>
-  </span>
+  </motion.span>
 );

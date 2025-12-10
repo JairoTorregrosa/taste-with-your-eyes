@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as clearMenus from "../clearMenus.js";
 import type * as menus from "../menus.js";
 
 import type {
@@ -17,6 +18,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  clearMenus: typeof clearMenus;
   menus: typeof menus;
 }>;
 

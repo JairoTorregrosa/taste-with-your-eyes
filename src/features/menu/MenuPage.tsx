@@ -7,10 +7,12 @@ import {
   useMutation,
   useQuery,
 } from "convex/react";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { ErrorBanner } from "@/src/features/menu/ErrorBanner";
+import { HeroSection } from "@/src/features/menu/HeroSection";
 import { LoadingState } from "@/src/features/menu/LoadingState";
 import { MenuView } from "@/src/features/menu/MenuView";
 import { Uploader } from "@/src/features/menu/Uploader";
@@ -44,9 +46,13 @@ function PageContent() {
   const [status, setStatus] = useState<FlowState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const menuSectionRef = useRef<HTMLDivElement>(null);
+
   const savedMenuFromDb = useQuery(
     api.menus.getMenuById,
-    savedId && sessionId ? { menuId: savedId as Id<"menus">, sessionId } : "skip",
+    savedId && sessionId
+      ? { menuId: savedId as Id<"menus">, sessionId }
+      : "skip",
   );
 
   useEffect(() => {
@@ -72,8 +78,24 @@ function PageContent() {
       setMenu(extracted);
       setStatus("done");
 
+      // Smooth scroll to menu section after a brief delay
+      setTimeout(() => {
+        menuSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 300);
+
       try {
-        const result = await saveMenu({ sessionId, menu: extracted });
+        const { imageBase64: _, ...menuWithoutImage } = extracted;
+        const menuToSave = {
+          ...menuWithoutImage,
+          categories: menuWithoutImage.categories.map((cat) => ({
+            ...cat,
+            items: cat.items.map(({ imageUrl: _img, ...item }) => item),
+          })),
+        };
+        const result = await saveMenu({ sessionId, menu: menuToSave });
         if (result?.id) {
           setSavedId(result.id);
           window.localStorage.setItem("twye_menu_id", result.id);
@@ -93,6 +115,9 @@ function PageContent() {
     setStatus("idle");
     setSavedId(null);
     window.localStorage.removeItem("twye_menu_id");
+
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -107,21 +132,94 @@ function PageContent() {
   }, [menu, savedMenuFromDb]);
 
   const isProcessing = status === "processing";
+  const showHero = status === "idle" && !menu;
 
   return (
-    <main className="flex min-h-screen w-full items-start justify-center bg-zinc-50 px-4 py-6 dark:bg-zinc-950">
-      <div className="flex w-full max-w-6xl flex-col gap-6">
-        {error && (
-          <ErrorBanner message={error} onRetry={() => setError(null)} />
+    <main className="min-h-screen w-full bg-zinc-50 dark:bg-zinc-950">
+      {/* Hero Section - only visible in idle state */}
+      <AnimatePresence mode="wait">
+        {showHero && (
+          <motion.div
+            key="hero"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <HeroSection />
+          </motion.div>
         )}
-        {isProcessing ? (
-          <LoadingState />
-        ) : menu ? (
-          <MenuView menu={menu} onReset={reset} savedId={savedId} />
-        ) : (
-          <Uploader onSelect={handleSelect} disabled={isProcessing} />
-        )}
+      </AnimatePresence>
+
+      {/* Main Content Area */}
+      <div
+        ref={menuSectionRef}
+        className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
+      >
+        <div className="flex flex-col items-center gap-8">
+          {/* Error Banner */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="w-full max-w-2xl overflow-hidden"
+              >
+                <ErrorBanner message={error} onRetry={() => setError(null)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Main Flow Content */}
+          <AnimatePresence mode="wait">
+            {isProcessing ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="w-full"
+              >
+                <LoadingState />
+              </motion.div>
+            ) : menu ? (
+              <motion.div
+                key="menu"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="w-full"
+              >
+                <MenuView menu={menu} onReset={reset} savedId={savedId} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="uploader"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="w-full"
+              >
+                <Uploader onSelect={handleSelect} disabled={isProcessing} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-zinc-200 bg-white/50 py-8 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/50">
+        <div className="mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Powered by AI • Upload any menu photo and watch the magic happen
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }
