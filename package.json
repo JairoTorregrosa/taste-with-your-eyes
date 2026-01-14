@@ -7,10 +7,12 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "biome check",
-    "convex:dev": "bunx convex dev --env .env.local",
     "format": "biome format --write",
     "test": "bun test",
     "check": "biome check && tsc --noEmit && bun test",
+    "convex:dev": "bunx convex dev --env .env.local",
+    "convex:deploy": "bunx convex deploy -y",
+    "deploy": "bun run check && bun run convex:deploy && bun run build",
     "test:integration": "bun scripts/integration/run-all.ts",
     "test:integration:fal": "bun scripts/integration/test-fal-image.ts",
     "test:integration:convex": "bun scripts/integration/test-convex-menu.ts"
