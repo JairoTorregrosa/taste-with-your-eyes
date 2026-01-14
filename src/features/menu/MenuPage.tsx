@@ -10,7 +10,7 @@ import { ErrorBanner } from "@/src/features/menu/ErrorBanner";
 import { HeroSection } from "@/src/features/menu/HeroSection";
 import { LoadingState } from "@/src/features/menu/LoadingState";
 import { type ImageProgress, MenuView } from "@/src/features/menu/MenuView";
-import { LIMITS, STORAGE_KEYS } from "@/src/lib/constants";
+import { LIMITS, RATE_LIMIT, STORAGE_KEYS } from "@/src/lib/constants";
 import type { MenuPayload } from "@/src/lib/validation";
 
 type FlowState = "idle" | "extracting" | "generating" | "done";
@@ -137,12 +137,35 @@ function PageContent() {
   }, [menu, savedMenuFromDb]);
 
   const handleSelect = async (dataUrl: string) => {
+    // Rate limiting check
+    const lastExtraction = window.localStorage.getItem(
+      RATE_LIMIT.LAST_EXTRACTION_KEY,
+    );
+    if (lastExtraction) {
+      const elapsed = Date.now() - Number.parseInt(lastExtraction, 10);
+      if (elapsed < RATE_LIMIT.MIN_EXTRACTION_INTERVAL_MS) {
+        const remaining = Math.ceil(
+          (RATE_LIMIT.MIN_EXTRACTION_INTERVAL_MS - elapsed) / 1000,
+        );
+        setError(
+          `Please wait ${remaining} seconds before scanning another menu`,
+        );
+        return;
+      }
+    }
+
     setStatus("extracting");
     setError(null);
     setMenu(null);
     setMenuId(null);
 
     try {
+      // Record extraction timestamp for rate limiting
+      window.localStorage.setItem(
+        RATE_LIMIT.LAST_EXTRACTION_KEY,
+        Date.now().toString(),
+      );
+
       // extractMenu now returns { menuId, menu } - backend handles saving internally
       const result = await extractMenu({
         sessionId,

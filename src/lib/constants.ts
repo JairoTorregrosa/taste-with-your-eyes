@@ -57,3 +57,13 @@ export const UI_CONFIG = {
   /** Input debounce delay */
   DEBOUNCE_MS: 300,
 } as const;
+
+/**
+ * Rate limiting configurations.
+ */
+export const RATE_LIMIT = {
+  /** Minimum time between menu extractions (in ms) */
+  MIN_EXTRACTION_INTERVAL_MS: 30_000,
+  /** LocalStorage key for last extraction timestamp */
+  LAST_EXTRACTION_KEY: "twye_last_extraction",
+} as const;

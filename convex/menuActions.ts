@@ -72,34 +72,19 @@ export const extractMenuFromImage = action({
       ? T
       : never;
   }> => {
-    console.log(
-      `[extractMenuFromImage] Starting extraction for session: ${args.sessionId}`,
-    );
     const { imageBase64 } = extractMenuArgsSchema.parse(args);
 
     // Phase 1: Fast extraction
-    console.log(`[extractMenuFromImage] Calling extractMenuWithVision...`);
     const menu = await extractMenuWithVision(imageBase64);
-    console.log(
-      `[extractMenuFromImage] Menu extracted: ${menu.categories.length} categories`,
-    );
-
-    console.log(`[extractMenuFromImage] Extracting theme...`);
     const theme = await extractMenuTheme(menu);
-    console.log(
-      `[extractMenuFromImage] Theme: ${theme.cuisineType} / ${theme.style}`,
-    );
 
     // Save menu immediately (without images)
-    console.log(`[extractMenuFromImage] Saving menu...`);
     const { menuId } = await ctx.runMutation(internal.menus.saveMenuInternal, {
       sessionId: args.sessionId,
       menu,
     });
-    console.log(`[extractMenuFromImage] Menu saved with ID: ${menuId}`);
 
     // Schedule parallel image generation (runs in background)
-    console.log(`[extractMenuFromImage] Scheduling generateImagesParallel...`);
     await ctx.scheduler.runAfter(
       0,
       internal.menuActions.generateImagesParallel,
@@ -108,9 +93,6 @@ export const extractMenuFromImage = action({
         sessionId: args.sessionId,
         theme,
       },
-    );
-    console.log(
-      `[extractMenuFromImage] Scheduled! Returning menuId: ${menuId}`,
     );
 
     return { menuId, menu };
@@ -128,14 +110,12 @@ export const generateImagesParallel = internalAction({
     theme: v.optional(menuThemeValidator),
   },
   handler: async (ctx, args) => {
-    console.log(`[generateImagesParallel] Starting for menuId: ${args.menuId}`);
-
     // Get menu from database
     const menu = await ctx.runQuery(internal.menus.getMenuByIdInternal, {
       menuId: args.menuId,
     });
     if (!menu) {
-      console.log(`[generateImagesParallel] Menu not found: ${args.menuId}`);
+      console.error(`[generateImagesParallel] Menu not found: ${args.menuId}`);
       return;
     }
 
@@ -145,13 +125,7 @@ export const generateImagesParallel = internalAction({
       LIMITS.MAX_IMAGES_PER_MENU,
     );
 
-    console.log(
-      `[generateImagesParallel] Items to generate: ${itemsToGenerate.length}`,
-      itemsToGenerate.map((i) => i.name),
-    );
-
     if (itemsToGenerate.length === 0) {
-      console.log(`[generateImagesParallel] No items to generate`);
       return;
     }
 
@@ -161,14 +135,10 @@ export const generateImagesParallel = internalAction({
       sessionId: args.sessionId,
       items: itemsToGenerate.map(({ key, name }) => ({ key, name })),
     });
-    console.log(`[generateImagesParallel] Created pending records`);
 
     // Generate all images in parallel
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       itemsToGenerate.map(async (item) => {
-        console.log(
-          `[generateImagesParallel] Starting generation for: ${item.name}`,
-        );
         try {
           // Update status to "generating"
           await ctx.runMutation(internal.menus.updateImageStatus, {
@@ -184,10 +154,6 @@ export const generateImagesParallel = internalAction({
             theme: args.theme,
           });
 
-          console.log(
-            `[generateImagesParallel] Generated image for ${item.name}: ${imageUrl?.substring(0, 50)}...`,
-          );
-
           // Update status to "completed" with URL
           await ctx.runMutation(internal.menus.updateImageStatus, {
             menuId: args.menuId,
@@ -195,12 +161,10 @@ export const generateImagesParallel = internalAction({
             status: "completed",
             imageUrl,
           });
-
-          return { success: true, item: item.name };
         } catch (error) {
           console.error(
-            `[generateImagesParallel] Error for ${item.name}:`,
-            error,
+            `[generateImagesParallel] Error generating image for ${item.name}:`,
+            error instanceof Error ? error.message : error,
           );
           // Update status to "failed"
           await ctx.runMutation(internal.menus.updateImageStatus, {
@@ -209,11 +173,8 @@ export const generateImagesParallel = internalAction({
             status: "failed",
             error: error instanceof Error ? error.message : "Unknown error",
           });
-          return { success: false, item: item.name, error };
         }
       }),
     );
-
-    console.log(`[generateImagesParallel] All done. Results:`, results);
   },
 });

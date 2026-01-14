@@ -309,20 +309,8 @@ export async function generateDishImage(params: {
         num_images: 1,
         output_format: "png",
       },
-      logs: true,
-      onQueueUpdate: (update) => {
-        if (update.status === "IN_PROGRESS" && update.logs) {
-          for (const log of update.logs) {
-            console.log(`[fal.ai] ${log.message}`);
-          }
-        }
-      },
+      logs: false,
     });
-
-    console.log(
-      `[fal.ai] Full response for "${name}":`,
-      JSON.stringify(result, null, 2),
-    );
 
     // Extract the image URL from the response
     // fal.subscribe returns { data, requestId } - images are in data.images
@@ -332,7 +320,6 @@ export async function generateDishImage(params: {
     const imageUrl = images?.[0]?.url;
 
     if (!imageUrl) {
-      console.error(`No image URL in fal.ai response for "${name}"`);
       throw new Error("No image URL returned from fal.ai");
     }
 
@@ -340,14 +327,7 @@ export async function generateDishImage(params: {
     // These URLs are valid for ~24 hours
     return imageUrl;
   } catch (err) {
-    console.error(`Image generation error for "${name}":`, err);
-    // Log full error details
-    if (err instanceof Error) {
-      console.error(`Error name: ${err.name}`);
-      console.error(`Error message: ${err.message}`);
-      console.error(`Error stack: ${err.stack}`);
-    }
-    // Re-throw to let the caller handle it and mark as failed
+    console.error(`[fal.ai] Image generation failed for "${name}":`, err);
     throw err;
   }
 }
