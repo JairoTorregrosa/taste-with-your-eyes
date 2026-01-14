@@ -25,7 +25,7 @@ export const LIMITS = {
   /** Maximum Convex document size in bytes */
   MAX_DOCUMENT_SIZE_BYTES: 700 * 1024,
   /** Maximum images to generate per menu */
-  MAX_IMAGES_PER_MENU: 4,
+  MAX_IMAGES_PER_MENU: 10,
   /** Maximum items to keep per category after truncation */
   MAX_ITEMS_PER_CATEGORY: 15,
   /** Maximum total items across all categories */
