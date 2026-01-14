@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Image as ImageIcon, Upload } from "lucide-react";
+import { Camera, CheckCircle2, ImagePlus, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 type Props = {
@@ -10,7 +10,8 @@ type Props = {
 };
 
 export function Uploader({ onSelect, disabled = false }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -87,7 +88,9 @@ export function Uploader({ onSelect, disabled = false }: Props) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => !disabled && !reading && inputRef.current?.click()}
+        onClick={() =>
+          !disabled && !reading && galleryInputRef.current?.click()
+        }
       >
         {/* Background gradient on hover */}
         <motion.div
@@ -181,30 +184,56 @@ export function Uploader({ onSelect, disabled = false }: Props) {
             )}
           </AnimatePresence>
 
-          {/* CTA Button */}
+          {/* CTA Buttons */}
           {!isDropped && (
-            <motion.button
-              type="button"
-              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-600 hover:to-emerald-700 hover:shadow-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-3.5 sm:text-base"
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                inputRef.current?.click();
-              }}
-              disabled={disabled || reading}
-            >
-              <ImageIcon className="h-5 w-5" />
-              {reading ? "Reading..." : "Choose photo"}
-            </motion.button>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
+              <motion.button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-600 hover:to-emerald-700 hover:shadow-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-3.5 sm:text-base"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cameraInputRef.current?.click();
+                }}
+                disabled={disabled || reading}
+              >
+                <Camera className="h-5 w-5" />
+                {reading ? "Reading..." : "Take Photo"}
+              </motion.button>
+              <motion.button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-600 hover:to-emerald-700 hover:shadow-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-3.5 sm:text-base"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  galleryInputRef.current?.click();
+                }}
+                disabled={disabled || reading}
+              >
+                <ImagePlus className="h-5 w-5" />
+                {reading ? "Reading..." : "From Gallery"}
+              </motion.button>
+            </div>
           )}
         </div>
 
+        {/* Hidden file input for camera (with capture) */}
         <input
-          ref={inputRef}
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          className="hidden"
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+
+        {/* Hidden file input for gallery (without capture) */}
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
           className="hidden"
           onChange={(e) => handleFile(e.target.files?.[0])}
         />

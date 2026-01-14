@@ -5,6 +5,64 @@ import { OpenRouter } from "@openrouter/sdk";
 
 const OCR_MODEL_ID = "google/gemini-2.5-flash";
 
+const MENU_EXTRACTION_SYSTEM_PROMPT = `You are a professional menu OCR specialist. Your extracted item names will generate food photography—each name must be a complete, self-describing dish name that works standalone.
+
+## OUTPUT FORMAT
+Return JSON only:
+{
+  "restaurantName": string | null,
+  "branding": { "primaryColor"?: string, "accentColor"?: string } | null,
+  "categories": [{
+    "name": string,
+    "items": [{
+      "name": string,
+      "description"?: string,
+      "price"?: string,
+      "confidence": number
+    }]
+  }]
+}
+
+## CRITICAL RULES
+
+### 1. EXPAND VARIANT LISTS (Most Important)
+When a category/header is followed by variants, PREPEND the category to each item:
+- "Cookies: Nutella, Chocolate" → "Nutella Cookie", "Chocolate Cookie"
+- "Crepes - Strawberry, Banana" → "Strawberry Crepe", "Banana Crepe"
+- "Ice Cream (Vanilla, Mint)" → "Vanilla Ice Cream", "Mint Ice Cream"
+- "Wings: Buffalo $10 / BBQ $12" → "Buffalo Wings $10", "BBQ Wings $12"
+- "Coffee: S $3 / M $4 / L $5" → "Small Coffee $3", "Medium Coffee $4", "Large Coffee $5"
+
+### 2. KEEP COMPOUND DISHES INTACT
+Multi-word dish names are ONE item:
+- "Chicken Caesar Salad" → ONE item
+- "Bacon Cheeseburger" → ONE item
+
+### 3. EXCLUDE NON-DISHES
+NEVER extract as items:
+- Section headers: "BREAKFAST", "Our Specialties"
+- Add-ons/modifiers: "Add bacon $2", "Extra cheese $1"
+- Placeholders: "etc.", "and more...", "..."
+
+### 4. HANDLE COMBOS
+"Combo #1: Burger + Fries + Drink $12" →
+  name: "Combo #1", description: "Burger + Fries + Drink", price: "$12"
+
+### 5. PRESERVE PORTIONS
+Keep size/portion info: "Wings (6pc)", "Pasta (serves 2)"
+
+### 6. MULTILINGUAL
+Expand in menu's language:
+- "Galletas: Chocolate, Vainilla" → "Galleta de Chocolate", "Galleta de Vainilla"
+
+## VALIDATION
+Before finalizing: "Can I picture the exact dish from just this name?" If no, prepend the category.
+
+## CONFIDENCE: 1.0=clear, 0.7-0.9=partial, 0.5-0.7=inferred, <0.5=guessed`;
+
+const MENU_EXTRACTION_USER_PROMPT =
+  'Extract all menu items from this photo. Expand ALL variant lists by prepending the category (e.g., "Tacos: Chicken, Beef" → "Chicken Tacos", "Beef Tacos"). Each name must work standalone for food photography.';
+
 function cleanJsonResponse(content: string): string {
   let cleaned = content.trim();
 
@@ -53,13 +111,12 @@ export async function extractMenuWithVision(
       messages: [
         {
           role: "system",
-          content:
-            "Extract menu data as JSON: { restaurantName?: string, branding?: { primaryColor?: string, accentColor?: string }, categories: [{ name: string, items: [{ name: string, description?: string, price?: string, confidence?: number }] }] }",
+          content: MENU_EXTRACTION_SYSTEM_PROMPT,
         },
         {
           role: "user",
           content: [
-            { type: "text", text: "Extract the menu from this photo." },
+            { type: "text", text: MENU_EXTRACTION_USER_PROMPT },
             { type: "image_url", imageUrl: { url: imageUrl } },
           ],
         },

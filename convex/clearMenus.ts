@@ -10,4 +10,3 @@ export const clearAllMenus = mutation({
     return { deleted: menus.length };
   },
 });
-

@@ -15,7 +15,6 @@ import { ErrorBanner } from "@/src/features/menu/ErrorBanner";
 import { HeroSection } from "@/src/features/menu/HeroSection";
 import { LoadingState } from "@/src/features/menu/LoadingState";
 import { MenuView } from "@/src/features/menu/MenuView";
-import { Uploader } from "@/src/features/menu/Uploader";
 import type { MenuPayload } from "@/src/lib/validation";
 
 type FlowState = "idle" | "processing" | "done";
@@ -146,7 +145,7 @@ function PageContent() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
           >
-            <HeroSection />
+            <HeroSection onSelect={handleSelect} disabled={isProcessing} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -196,18 +195,7 @@ function PageContent() {
               >
                 <MenuView menu={menu} onReset={reset} savedId={savedId} />
               </motion.div>
-            ) : (
-              <motion.div
-                key="uploader"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="w-full"
-              >
-                <Uploader onSelect={handleSelect} disabled={isProcessing} />
-              </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
       </div>

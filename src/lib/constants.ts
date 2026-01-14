@@ -4,4 +4,5 @@ export const TAGLINE =
 export const CONTACT_EMAIL = "support@tastewithyoureyes.app";
 export const ROUTES = {
   HOME: "/",
+  HOW_IT_WORKS: "/how-it-works",
 } as const;
