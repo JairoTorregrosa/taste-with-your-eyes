@@ -271,7 +271,7 @@ const enrichWithImages = async (
 
   for (const cat of result) {
     for (const item of cat.items) {
-      if (item.imageUrl || count >= LIMITS.MAX_IMAGES_PER_CATEGORY) continue;
+      if (item.imageUrl || count >= LIMITS.MAX_IMAGES_PER_MENU) continue;
       count++;
 
       try {

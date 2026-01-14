@@ -1,15 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, RefreshCw, Sparkles } from "lucide-react";
+import { ImageIcon, RefreshCw, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { LIMITS } from "@/src/lib/constants";
+import { cn } from "@/src/lib/utils";
 import type { MenuPayload } from "@/src/lib/validation";
 
 type Props = {
   menu: MenuPayload;
   onReset: () => void;
-  savedId?: string | null;
 };
 
 const containerVariants = {
@@ -32,11 +33,16 @@ const itemVariants = {
   },
 };
 
-export function MenuView({ menu, onReset, savedId }: Props) {
+export function MenuView({ menu, onReset }: Props) {
   const totalItems = menu.categories.reduce(
     (sum, cat) => sum + cat.items.length,
     0,
   );
+  const itemsWithImages = menu.categories.reduce(
+    (sum, cat) => sum + cat.items.filter((item) => item.imageUrl).length,
+    0,
+  );
+  const isSingleCategory = menu.categories.length === 1;
 
   return (
     <motion.div
@@ -90,33 +96,23 @@ export function MenuView({ menu, onReset, savedId }: Props) {
                 </motion.p>
               )}
             </div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex flex-wrap items-center gap-2.5"
-            >
-              {menu.branding?.primaryColor && (
-                <ColorSwatch
-                  label="Primary"
-                  value={menu.branding.primaryColor}
-                />
-              )}
-              {menu.branding?.accentColor && (
-                <ColorSwatch label="Accent" value={menu.branding.accentColor} />
-              )}
-              {savedId && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/40"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  Saved
-                </motion.span>
-              )}
-            </motion.div>
+            {/* Image generation indicator */}
+            {itemsWithImages > 0 && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                AI images generated for {itemsWithImages} of {totalItems} items
+                {itemsWithImages >= LIMITS.MAX_IMAGES_PER_MENU && (
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    — otherwise I'd go broke
+                  </span>
+                )}
+              </motion.p>
+            )}
           </div>
           <motion.button
             type="button"
@@ -136,7 +132,7 @@ export function MenuView({ menu, onReset, savedId }: Props) {
 
       {/* Categories and Dishes */}
       <motion.div
-        className="grid gap-10 lg:grid-cols-2"
+        className={cn("grid gap-10", !isSingleCategory && "lg:grid-cols-2")}
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -169,8 +165,10 @@ export function MenuView({ menu, onReset, savedId }: Props) {
               </span>
             </div>
 
-            {/* Dish Cards */}
-            <div className="grid gap-5">
+            {/* Dish Cards - 2 columns for single category, 1 column otherwise */}
+            <div
+              className={cn("grid gap-5", isSingleCategory && "sm:grid-cols-2")}
+            >
               {cat.items.map((item, itemIndex) => (
                 <DishCard
                   key={`${item.name}-${itemIndex}`}
@@ -344,18 +342,3 @@ const DishCard = ({
     </motion.article>
   );
 };
-
-const ColorSwatch = ({ label, value }: { label: string; value: string }) => (
-  <motion.span
-    whileHover={{ scale: 1.05 }}
-    className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-  >
-    <span
-      aria-hidden
-      className="h-4 w-4 rounded-full border-2 border-zinc-200 shadow-sm dark:border-zinc-700"
-      style={{ background: value }}
-    />
-    <span className="font-medium">{label}</span>
-    <span className="font-mono text-[10px] opacity-70">{value}</span>
-  </motion.span>
-);

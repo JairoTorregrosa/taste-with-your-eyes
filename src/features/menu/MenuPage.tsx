@@ -186,7 +186,7 @@ function PageContent() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <MenuView menu={menu} onReset={reset} savedId={savedId} />
+                <MenuView menu={menu} onReset={reset} />
               </motion.div>
             ) : null}
           </AnimatePresence>
