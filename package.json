@@ -10,7 +10,10 @@
     "convex:dev": "bunx convex dev --env .env.local",
     "format": "biome format --write",
     "test": "bun test",
-    "check": "biome check && tsc --noEmit && bun test"
+    "check": "biome check && tsc --noEmit && bun test",
+    "test:integration": "bun scripts/integration/run-all.ts",
+    "test:integration:fal": "bun scripts/integration/test-fal-image.ts",
+    "test:integration:convex": "bun scripts/integration/test-convex-menu.ts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
@@ -32,6 +35,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

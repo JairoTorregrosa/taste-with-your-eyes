@@ -1,19 +1,17 @@
-import { actionGeneric } from "convex/server";
+/**
+ * Convex mutations and queries for menu management.
+ * Actions that require Node.js are in menuActions.ts.
+ */
+
 import { v } from "convex/values";
 import { LIMITS } from "@/src/lib/constants";
+import { menuPayloadSchema, saveMenuArgsSchema } from "@/src/lib/validation";
 import {
-  extractMenuTheme,
-  extractMenuWithVision,
-  generateDishImage,
-  type MenuTheme,
-} from "@/src/lib/openrouter";
-import {
-  extractMenuArgsSchema,
-  type MenuCategory,
-  menuPayloadSchema,
-  saveMenuArgsSchema,
-} from "@/src/lib/validation";
-import { mutation, query } from "./_generated/server";
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 
 const menuItemValidator = v.object({
   name: v.string(),
@@ -120,17 +118,6 @@ function truncateMenuData(
 
   return truncated;
 }
-
-export const extractMenuFromImage = actionGeneric({
-  args: { sessionId: v.string(), imageBase64: v.string() },
-  handler: async (_ctx, args) => {
-    const { imageBase64 } = extractMenuArgsSchema.parse(args);
-    const menu = await extractMenuWithVision(imageBase64);
-    const theme = await extractMenuTheme(menu);
-    const categories = await enrichWithImages(menu.categories, theme);
-    return { menu: { ...menu, categories } };
-  },
-});
 
 export const saveMenu = mutation({
   args: { sessionId: v.string(), menu: menuPayloadValidator },
@@ -258,34 +245,228 @@ export const getMenuById = query({
   },
 });
 
-const enrichWithImages = async (
-  categories: MenuCategory[],
-  theme?: MenuTheme,
-) => {
-  const result = categories.map((cat) => ({
-    ...cat,
-    items: cat.items.map((item) => ({ ...item })),
-  }));
+// ============================================================================
+// Internal mutations for parallel image generation
+// ============================================================================
 
-  let count = 0;
-
-  for (const cat of result) {
-    for (const item of cat.items) {
-      if (item.imageUrl || count >= LIMITS.MAX_IMAGES_PER_MENU) continue;
-      count++;
-
-      try {
-        const url = await generateDishImage({
-          name: item.name,
-          description: item.description,
-          theme,
-        });
-        item.imageUrl = url;
-      } catch (error) {
-        console.error(`Failed to generate image for "${item.name}":`, error);
-      }
+export const saveMenuInternal = internalMutation({
+  args: { sessionId: v.string(), menu: menuPayloadValidator },
+  handler: async (ctx, args) => {
+    // Delete existing menus for this session
+    const existingMenus = await ctx.db
+      .query("menus")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+    for (const menu of existingMenus) {
+      await ctx.db.delete(menu._id);
     }
-  }
 
-  return result;
-};
+    // Delete any existing image generation records
+    const existingImages = await ctx.db
+      .query("imageGenerations")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+    for (const img of existingImages) {
+      await ctx.db.delete(img._id);
+    }
+
+    // Save menu (without images)
+    const now = Date.now();
+    const { imageBase64: _, ...menuData } = args.menu;
+
+    // Strip any existing imageUrls from categories
+    const menuWithoutImages = {
+      ...menuData,
+      categories: menuData.categories.map((cat) => ({
+        ...cat,
+        items: cat.items.map(({ imageUrl: _u, ...item }) => item),
+      })),
+    };
+
+    // Apply truncation and size validation (same as saveMenu)
+    const maxSizeBytes = LIMITS.MAX_DOCUMENT_SIZE_BYTES;
+    let truncatedMenu = truncateMenuData(menuWithoutImages);
+    let reductionFactor = 1.0;
+    let iterations = 0;
+    const maxIterations = 10;
+
+    while (iterations < maxIterations) {
+      const totalItems = truncatedMenu.categories.reduce(
+        (sum, cat) => sum + cat.items.length,
+        0,
+      );
+      const totalCategories = truncatedMenu.categories.length;
+      const hasRestaurantName = !!truncatedMenu.restaurantName;
+      const hasBranding = !!truncatedMenu.branding;
+
+      const documentToInsert = {
+        sessionId: args.sessionId,
+        ...truncatedMenu,
+        totalItems,
+        totalCategories,
+        hasRestaurantName,
+        hasBranding,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const estimatedSize = JSON.stringify(documentToInsert).length;
+
+      if (estimatedSize <= maxSizeBytes) {
+        break;
+      }
+
+      reductionFactor *= 0.8;
+      const newMaxItemsPerCategory = Math.max(
+        5,
+        Math.floor(30 * reductionFactor),
+      );
+      const newMaxTotalItems = Math.max(20, Math.floor(100 * reductionFactor));
+
+      truncatedMenu = truncateMenuData(
+        menuWithoutImages,
+        newMaxItemsPerCategory,
+        newMaxTotalItems,
+      );
+      iterations++;
+    }
+
+    const totalItems = truncatedMenu.categories.reduce(
+      (sum, cat) => sum + cat.items.length,
+      0,
+    );
+    const totalCategories = truncatedMenu.categories.length;
+    const hasRestaurantName = !!truncatedMenu.restaurantName;
+    const hasBranding = !!truncatedMenu.branding;
+
+    const documentToInsert = {
+      sessionId: args.sessionId,
+      ...truncatedMenu,
+      totalItems,
+      totalCategories,
+      hasRestaurantName,
+      hasBranding,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const finalEstimatedSize = JSON.stringify(documentToInsert).length;
+    const finalSizeInMiB = finalEstimatedSize / (1024 * 1024);
+
+    if (finalEstimatedSize > maxSizeBytes) {
+      throw new Error(
+        `Menu data is too large (estimated ${finalSizeInMiB.toFixed(2)} MiB > ${(maxSizeBytes / (1024 * 1024)).toFixed(2)} MiB safe limit) even after ${iterations} reduction iterations. Please reduce the number of items or descriptions.`,
+      );
+    }
+
+    const menuId = await ctx.db.insert("menus", documentToInsert);
+
+    return { menuId };
+  },
+});
+
+export const createPendingImageRecords = internalMutation({
+  args: {
+    menuId: v.id("menus"),
+    sessionId: v.string(),
+    items: v.array(
+      v.object({
+        key: v.string(),
+        name: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    for (const item of args.items) {
+      await ctx.db.insert("imageGenerations", {
+        menuId: args.menuId,
+        sessionId: args.sessionId,
+        itemKey: item.key,
+        itemName: item.name,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+export const updateImageStatus = internalMutation({
+  args: {
+    menuId: v.id("menus"),
+    itemKey: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    imageUrl: v.optional(v.string()),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db
+      .query("imageGenerations")
+      .withIndex("by_menu", (q) => q.eq("menuId", args.menuId))
+      .filter((q) => q.eq(q.field("itemKey"), args.itemKey))
+      .first();
+
+    if (record) {
+      await ctx.db.patch(record._id, {
+        status: args.status,
+        imageUrl: args.imageUrl,
+        error: args.error,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
+export const getMenuByIdInternal = internalQuery({
+  args: { menuId: v.id("menus") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.menuId);
+  },
+});
+
+// ============================================================================
+// Public queries for progress tracking
+// ============================================================================
+
+export const getImageProgress = query({
+  args: { menuId: v.id("menus"), sessionId: v.string() },
+  handler: async (ctx, args) => {
+    // Verify menu belongs to session
+    const menu = await ctx.db.get(args.menuId);
+    if (!menu || menu.sessionId !== args.sessionId) {
+      return null;
+    }
+
+    const records = await ctx.db
+      .query("imageGenerations")
+      .withIndex("by_menu", (q) => q.eq("menuId", args.menuId))
+      .collect();
+
+    const total = records.length;
+    const completed = records.filter((r) => r.status === "completed").length;
+    const generating = records.filter((r) => r.status === "generating").length;
+    const failed = records.filter((r) => r.status === "failed").length;
+    const pending = records.filter((r) => r.status === "pending").length;
+
+    return {
+      total,
+      completed,
+      generating,
+      failed,
+      pending,
+      items: records.map((r) => ({
+        itemKey: r.itemKey,
+        itemName: r.itemName,
+        status: r.status,
+        imageUrl: r.imageUrl,
+        error: r.error,
+      })),
+    };
+  },
+});

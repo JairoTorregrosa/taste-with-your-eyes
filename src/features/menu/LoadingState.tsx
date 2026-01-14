@@ -1,39 +1,67 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
 import { ProgressStepper } from "./ProgressStepper";
 
-const loadingMessages = [
+type ImageProgressData = {
+  total: number;
+  completed: number;
+  generating: number;
+};
+
+type Props = {
+  phase: "extracting" | "generating";
+  imageProgress?: ImageProgressData;
+};
+
+const extractingMessages = [
   "Scanning your menu...",
   "Identifying dishes and prices...",
-  "Building your digital menu...",
-  "Generating beautiful images...",
+  "Extracting text from image...",
+];
+
+const generatingMessages = [
+  "Creating beautiful images...",
+  "Visualizing your dishes...",
   "Almost there...",
 ];
 
-export function LoadingState() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [messageIndex, setMessageIndex] = useState(0);
+export function LoadingState({ phase, imageProgress }: Props) {
+  // Determine current step based on phase
+  const currentStep = phase === "extracting" ? 0 : 2;
 
-  // Simulate progress through steps
-  useEffect(() => {
-    const stepTimer = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev < 2) return prev + 1;
-        return prev;
-      });
-    }, 4000);
+  // Get the appropriate message based on phase and progress
+  const getMessage = () => {
+    if (phase === "extracting") {
+      return extractingMessages[0];
+    }
 
-    const messageTimer = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % loadingMessages.length);
-    }, 3000);
+    if (imageProgress && imageProgress.completed > 0) {
+      return `Generated ${imageProgress.completed} of ${imageProgress.total} images...`;
+    }
 
-    return () => {
-      clearInterval(stepTimer);
-      clearInterval(messageTimer);
-    };
-  }, []);
+    if (imageProgress && imageProgress.generating > 0) {
+      return generatingMessages[1];
+    }
+
+    return generatingMessages[0];
+  };
+
+  const getSubMessage = () => {
+    if (phase === "extracting") {
+      return "Analyzing your menu photo...";
+    }
+
+    if (imageProgress) {
+      const remaining = imageProgress.total - imageProgress.completed;
+      if (remaining > 0) {
+        return `${remaining} image${remaining === 1 ? "" : "s"} remaining`;
+      }
+      return "Finishing up...";
+    }
+
+    return "This usually takes 10-30 seconds";
+  };
 
   return (
     <motion.div
@@ -41,7 +69,7 @@ export function LoadingState() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-2xl mx-auto"
+      className="mx-auto w-full max-w-2xl"
     >
       <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white/80 p-8 shadow-lg backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 sm:p-12">
         {/* Animated Logo */}
@@ -87,24 +115,53 @@ export function LoadingState() {
           <ProgressStepper currentStep={currentStep} />
         </div>
 
-        {/* Animated Message */}
+        {/* Real-time progress for generating phase */}
+        {phase === "generating" && imageProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <div className="mx-auto max-w-xs">
+              <div className="mb-2 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                <span>Generating images</span>
+                <span>
+                  {imageProgress.completed}/{imageProgress.total}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${imageProgress.total > 0 ? (imageProgress.completed / imageProgress.total) * 100 : 0}%`,
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Message */}
         <div className="text-center">
           <motion.h2
-            key={messageIndex}
+            key={getMessage()}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="text-xl font-semibold text-zinc-900 dark:text-white sm:text-2xl"
           >
-            {loadingMessages[messageIndex]}
+            {getMessage()}
           </motion.h2>
           <motion.p
+            key={getSubMessage()}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
             className="mt-3 text-sm text-zinc-500 dark:text-zinc-400"
           >
-            This usually takes 10-30 seconds depending on the menu size
+            {getSubMessage()}
           </motion.p>
         </div>
 
@@ -116,8 +173,10 @@ export function LoadingState() {
           className="mt-8 rounded-2xl bg-gradient-to-r from-emerald-50 to-sky-50 p-4 text-center dark:from-emerald-500/5 dark:to-sky-500/5"
         >
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            💡 <span className="font-medium">Tip:</span> The clearer your menu
-            photo, the better the results!
+            💡 <span className="font-medium">Tip:</span>{" "}
+            {phase === "extracting"
+              ? "The clearer your menu photo, the better the results!"
+              : "AI is creating unique images for each dish!"}
           </p>
         </motion.div>
       </div>

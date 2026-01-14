@@ -1,6 +1,6 @@
 "use client";
 
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -9,11 +9,11 @@ import { ConvexClientProvider, ErrorBoundary } from "@/src/components/shared";
 import { ErrorBanner } from "@/src/features/menu/ErrorBanner";
 import { HeroSection } from "@/src/features/menu/HeroSection";
 import { LoadingState } from "@/src/features/menu/LoadingState";
-import { MenuView } from "@/src/features/menu/MenuView";
-import { STORAGE_KEYS } from "@/src/lib/constants";
+import { type ImageProgress, MenuView } from "@/src/features/menu/MenuView";
+import { LIMITS, STORAGE_KEYS } from "@/src/lib/constants";
 import type { MenuPayload } from "@/src/lib/validation";
 
-type FlowState = "idle" | "processing" | "done";
+type FlowState = "idle" | "extracting" | "generating" | "done";
 
 export interface MenuPageProps {
   convexUrl: string;
@@ -30,44 +30,88 @@ export function MenuPage({ convexUrl }: MenuPageProps) {
 }
 
 function PageContent() {
-  const extractMenu = useAction(api.menus.extractMenuFromImage);
-  const saveMenu = useMutation(api.menus.saveMenu);
+  const extractMenu = useAction(api.menuActions.extractMenuFromImage);
 
   const [sessionId, setSessionId] = useState("");
   const [menu, setMenu] = useState<MenuPayload | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
   const [status, setStatus] = useState<FlowState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);
   const menuSectionRef = useRef<HTMLDivElement>(null);
 
+  // Subscribe to image progress when we have a menuId
+  const imageProgress = useQuery(
+    api.menus.getImageProgress,
+    menuId && sessionId ? { menuId: menuId as Id<"menus">, sessionId } : "skip",
+  ) as ImageProgress | null | undefined;
+
+  // Load saved menu from database
   const savedMenuFromDb = useQuery(
     api.menus.getMenuById,
-    savedId && sessionId
-      ? { menuId: savedId as Id<"menus">, sessionId }
+    menuId && sessionId && status === "idle"
+      ? { menuId: menuId as Id<"menus">, sessionId }
       : "skip",
   );
 
+  // Initialize session ID from localStorage
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEYS.SESSION);
     const sid = stored || crypto.randomUUID();
     window.localStorage.setItem(STORAGE_KEYS.SESSION, sid);
     setSessionId(sid);
-    const menuId = window.localStorage.getItem(STORAGE_KEYS.MENU_ID);
-    if (menuId) setSavedId(menuId);
+    const storedMenuId = window.localStorage.getItem(STORAGE_KEYS.MENU_ID);
+    if (storedMenuId) setMenuId(storedMenuId);
   }, []);
 
-  const handleSelect = async (dataUrl: string) => {
-    setStatus("processing");
-    setError(null);
-    setMenu(null);
-    setSavedId(null);
+  // Transition from "generating" to "done" when:
+  // 1. At least 1 image completes, OR
+  // 2. All images have finished (completed + failed === total with total > 0), OR
+  // 3. Menu has no items to generate images for
+  useEffect(() => {
+    if (status !== "generating") return;
 
-    try {
-      const { menu: extracted } = await extractMenu({
-        sessionId,
-        imageBase64: dataUrl,
-      });
-      setMenu(extracted);
+    // imageProgress is undefined while loading, null if menu not found
+    if (imageProgress === undefined) return;
+
+    // If menu not found, transition to done (error case)
+    if (imageProgress === null) {
+      setStatus("done");
+      setTimeout(() => {
+        menuSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 300);
+      return;
+    }
+
+    const { total, completed, pending, generating } = imageProgress;
+
+    // Calculate expected images based on menu items
+    const menuItemCount =
+      menu?.categories.reduce((sum, cat) => sum + cat.items.length, 0) ?? 0;
+    const expectedImages = Math.min(menuItemCount, LIMITS.MAX_IMAGES_PER_MENU);
+
+    // If menu has no items to generate, transition immediately
+    if (expectedImages === 0) {
+      setStatus("done");
+      setTimeout(() => {
+        menuSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 300);
+      return;
+    }
+
+    // If total === 0 but we expect images, wait for records to be created
+    if (total === 0) return;
+
+    const allFinished = pending === 0 && generating === 0;
+    const hasAtLeastOneComplete = completed >= 1;
+
+    // Transition to done if we have at least one image OR all work is finished
+    if (hasAtLeastOneComplete || allFinished) {
       setStatus("done");
 
       // Smooth scroll to menu section after a brief delay
@@ -77,41 +121,10 @@ function PageContent() {
           block: "start",
         });
       }, 300);
-
-      try {
-        const { imageBase64: _, ...menuWithoutImage } = extracted;
-        const menuToSave = {
-          ...menuWithoutImage,
-          categories: menuWithoutImage.categories.map((cat) => ({
-            ...cat,
-            items: cat.items.map(({ imageUrl: _img, ...item }) => item),
-          })),
-        };
-        const result = await saveMenu({ sessionId, menu: menuToSave });
-        if (result?.id) {
-          setSavedId(result.id);
-          window.localStorage.setItem(STORAGE_KEYS.MENU_ID, result.id);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save menu");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not extract menu");
-      setStatus("idle");
     }
-  };
+  }, [status, imageProgress, menu]);
 
-  const reset = () => {
-    setMenu(null);
-    setError(null);
-    setStatus("idle");
-    setSavedId(null);
-    window.localStorage.removeItem(STORAGE_KEYS.MENU_ID);
-
-    // Scroll back to top
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
+  // Load menu from localStorage on mount
   useEffect(() => {
     if (!menu && savedMenuFromDb) {
       setMenu({
@@ -123,8 +136,49 @@ function PageContent() {
     }
   }, [menu, savedMenuFromDb]);
 
-  const isProcessing = status === "processing";
+  const handleSelect = async (dataUrl: string) => {
+    setStatus("extracting");
+    setError(null);
+    setMenu(null);
+    setMenuId(null);
+
+    try {
+      // extractMenu now returns { menuId, menu } - backend handles saving internally
+      const result = await extractMenu({
+        sessionId,
+        imageBase64: dataUrl,
+      });
+
+      const { menuId: newMenuId, menu: extracted } = result;
+
+      setMenu(extracted);
+      setMenuId(newMenuId);
+      setStatus("generating");
+
+      // Store menuId for persistence
+      if (newMenuId) {
+        window.localStorage.setItem(STORAGE_KEYS.MENU_ID, newMenuId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not extract menu");
+      setStatus("idle");
+    }
+  };
+
+  const reset = () => {
+    setMenu(null);
+    setError(null);
+    setStatus("idle");
+    setMenuId(null);
+    window.localStorage.removeItem(STORAGE_KEYS.MENU_ID);
+
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const isProcessing = status === "extracting" || status === "generating";
   const showHero = status === "idle" && !menu;
+  const showMenu = status === "done" && menu;
 
   return (
     <main className="min-h-screen w-full bg-zinc-50 dark:bg-zinc-950">
@@ -166,7 +220,7 @@ function PageContent() {
 
           {/* Main Flow Content */}
           <AnimatePresence mode="wait">
-            {isProcessing ? (
+            {isProcessing && (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0, y: 20 }}
@@ -175,9 +229,21 @@ function PageContent() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <LoadingState />
+                <LoadingState
+                  phase={status === "extracting" ? "extracting" : "generating"}
+                  imageProgress={
+                    imageProgress
+                      ? {
+                          total: imageProgress.total,
+                          completed: imageProgress.completed,
+                          generating: imageProgress.generating,
+                        }
+                      : undefined
+                  }
+                />
               </motion.div>
-            ) : menu ? (
+            )}
+            {showMenu && (
               <motion.div
                 key="menu"
                 initial={{ opacity: 0, y: 20 }}
@@ -186,9 +252,13 @@ function PageContent() {
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                <MenuView menu={menu} onReset={reset} />
+                <MenuView
+                  menu={menu}
+                  onReset={reset}
+                  imageProgress={imageProgress ?? undefined}
+                />
               </motion.div>
-            ) : null}
+            )}
           </AnimatePresence>
         </div>
       </div>

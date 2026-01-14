@@ -41,7 +41,7 @@ export const AI_CONFIG = {
   /** OpenRouter model for menu extraction */
   VISION_MODEL: "google/gemini-2.5-flash-preview",
   /** fal.ai model for image generation */
-  IMAGE_MODEL: "fal-ai/flux/schnell",
+  IMAGE_MODEL: "fal-ai/gpt-image-1.5",
   /** Maximum dimension for generated images */
   MAX_IMAGE_DIMENSION: 1024,
 } as const;

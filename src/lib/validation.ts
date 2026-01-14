@@ -1,10 +1,18 @@
 import { z } from "zod";
+
+/**
+ * Helper to handle null values from LLM responses.
+ * LLMs often return null instead of omitting the field.
+ */
+const nullToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === null ? undefined : val), schema);
+
 export const menuItemSchema = z.object({
   name: z.string(),
-  description: z.string().optional(),
-  price: z.string().optional(),
-  confidence: z.number().optional(),
-  imageUrl: z.string().optional(),
+  description: nullToUndefined(z.string().optional()),
+  price: nullToUndefined(z.string().optional()),
+  confidence: nullToUndefined(z.number().optional()),
+  imageUrl: nullToUndefined(z.string().optional()),
 });
 
 export const menuCategorySchema = z.object({
@@ -13,15 +21,15 @@ export const menuCategorySchema = z.object({
 });
 
 export const menuBrandingSchema = z.object({
-  primaryColor: z.string().optional(),
-  accentColor: z.string().optional(),
+  primaryColor: nullToUndefined(z.string().optional()),
+  accentColor: nullToUndefined(z.string().optional()),
 });
 
 export const menuPayloadSchema = z.object({
-  restaurantName: z.string().optional(),
-  branding: menuBrandingSchema.optional(),
+  restaurantName: nullToUndefined(z.string().optional()),
+  branding: nullToUndefined(menuBrandingSchema.optional()),
   categories: z.array(menuCategorySchema),
-  imageBase64: z.string().optional(),
+  imageBase64: nullToUndefined(z.string().optional()),
 });
 
 export const extractMenuArgsSchema = z.object({

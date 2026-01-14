@@ -1,7 +1,36 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+/**
+ * Image generation status type for tracking individual image progress.
+ */
+const imageStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("generating"),
+  v.literal("completed"),
+  v.literal("failed"),
+);
+
 export default defineSchema({
+  /**
+   * Tracks individual image generation progress for real-time UI updates.
+   * Images are generated in parallel and status updates stream to the client.
+   */
+  imageGenerations: defineTable({
+    menuId: v.id("menus"),
+    sessionId: v.string(),
+    itemKey: v.string(), // Format: "cat:{categoryIndex}:item:{itemIndex}"
+    itemName: v.string(),
+    status: imageStatusValidator,
+    imageUrl: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.float64(),
+    updatedAt: v.float64(),
+  })
+    .index("by_menu", ["menuId"])
+    .index("by_menu_item", ["menuId", "itemKey"])
+    .index("by_session", ["sessionId"]),
+
   menus: defineTable({
     // Identity
     sessionId: v.string(),

@@ -9,6 +9,7 @@
  */
 
 import type * as _internal from "../_internal.js";
+import type * as menuActions from "../menuActions.js";
 import type * as menus from "../menus.js";
 
 import type {
@@ -19,6 +20,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   _internal: typeof _internal;
+  menuActions: typeof menuActions;
   menus: typeof menus;
 }>;
 

@@ -1,6 +1,5 @@
 import { fal } from "@fal-ai/client";
 import { OpenRouter } from "@openrouter/sdk";
-import { stringToBase64 } from "@/src/lib/base64";
 import { type MenuPayload, menuPayloadSchema } from "@/src/lib/validation";
 
 const OCR_MODEL_ID = "google/gemini-2.5-flash";
@@ -301,21 +300,36 @@ export async function generateDishImage(params: {
       credentials: getFalKey(),
     });
 
-    // Call fal.ai Z-Image Turbo model
-    const result = await fal.subscribe("fal-ai/nano-banana-pro", {
+    // Call fal.ai GPT-Image 1.5 model (text-to-image)
+    const result = await fal.subscribe("fal-ai/gpt-image-1.5", {
       input: {
         prompt,
-        image_size: "square_hd",
-        num_inference_steps: 8,
+        image_size: "1024x1024",
+        quality: "low",
         num_images: 1,
-        enable_safety_checker: true,
         output_format: "png",
       },
-      logs: false,
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (update.status === "IN_PROGRESS" && update.logs) {
+          for (const log of update.logs) {
+            console.log(`[fal.ai] ${log.message}`);
+          }
+        }
+      },
     });
 
+    console.log(
+      `[fal.ai] Full response for "${name}":`,
+      JSON.stringify(result, null, 2),
+    );
+
     // Extract the image URL from the response
-    const imageUrl = result.data?.images?.[0]?.url;
+    // fal.subscribe returns { data, requestId } - images are in data.images
+    const images =
+      result.data?.images ??
+      (result as { images?: Array<{ url: string }> }).images;
+    const imageUrl = images?.[0]?.url;
 
     if (!imageUrl) {
       console.error(`No image URL in fal.ai response for "${name}"`);
@@ -327,8 +341,13 @@ export async function generateDishImage(params: {
     return imageUrl;
   } catch (err) {
     console.error(`Image generation error for "${name}":`, err);
-    const safe = params.name.replaceAll('"', "");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="#f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#374151" font-family="Arial" font-size="32" font-weight="700">${safe}</text></svg>`;
-    return `data:image/svg+xml;base64,${stringToBase64(svg)}`;
+    // Log full error details
+    if (err instanceof Error) {
+      console.error(`Error name: ${err.name}`);
+      console.error(`Error message: ${err.message}`);
+      console.error(`Error stack: ${err.stack}`);
+    }
+    // Re-throw to let the caller handle it and mark as failed
+    throw err;
   }
 }
