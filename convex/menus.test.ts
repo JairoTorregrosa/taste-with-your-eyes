@@ -83,7 +83,6 @@ describe("Menu Functions", () => {
               name: "Item",
               description: "Description",
               price: "$10",
-              confidence: 0.9,
               imageUrl: "https://example.com/image.jpg",
             },
           ],

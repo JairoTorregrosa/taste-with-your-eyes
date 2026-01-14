@@ -52,9 +52,7 @@ export default defineSchema({
             name: v.string(),
             description: v.optional(v.string()),
             price: v.optional(v.string()),
-            confidence: v.optional(v.float64()),
             imageUrl: v.optional(v.string()),
-            imageAlt: v.optional(v.string()), // Accessibility
           }),
         ),
       }),
@@ -71,4 +69,63 @@ export default defineSchema({
     .index("by_session", ["sessionId"])
     .index("by_created_at", ["createdAt"]),
   // Removed unused indexes: by_restaurant, by_has_restaurant
+
+  /**
+   * Tracks all LLM/AI API calls for observability.
+   * Stores full prompts, outputs, token usage, timing, and costs.
+   */
+  llmCalls: defineTable({
+    // Identity & Context
+    menuId: v.optional(v.id("menus")),
+    sessionId: v.string(),
+    operation: v.union(
+      v.literal("menu_extraction"),
+      v.literal("theme_extraction"),
+      v.literal("image_generation"),
+    ),
+
+    // Provider Info
+    provider: v.union(v.literal("openrouter"), v.literal("fal.ai")),
+    model: v.string(),
+
+    // Input Data
+    inputPrompt: v.string(),
+    inputSystemPrompt: v.optional(v.string()),
+    inputMetadata: v.optional(
+      v.object({
+        imageBase64Length: v.optional(v.float64()),
+        temperature: v.optional(v.float64()),
+        imageSize: v.optional(v.string()),
+        quality: v.optional(v.string()),
+      }),
+    ),
+
+    // Output Data
+    outputRaw: v.optional(v.string()),
+    outputParsed: v.optional(v.string()),
+    outputImageUrl: v.optional(v.string()),
+
+    // Token Usage
+    tokenUsage: v.optional(
+      v.object({
+        promptTokens: v.optional(v.float64()),
+        completionTokens: v.optional(v.float64()),
+        totalTokens: v.optional(v.float64()),
+      }),
+    ),
+
+    // Timing
+    startedAt: v.float64(),
+    completedAt: v.optional(v.float64()),
+    durationMs: v.optional(v.float64()),
+
+    // Status
+    success: v.boolean(),
+    error: v.optional(v.string()),
+    estimatedCostUsd: v.optional(v.float64()),
+  })
+    .index("by_menu", ["menuId"])
+    .index("by_session", ["sessionId"])
+    .index("by_operation", ["operation"])
+    .index("by_created", ["startedAt"]),
 });

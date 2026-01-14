@@ -9,6 +9,7 @@
  */
 
 import type * as _internal from "../_internal.js";
+import type * as llmCalls from "../llmCalls.js";
 import type * as menuActions from "../menuActions.js";
 import type * as menus from "../menus.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   _internal: typeof _internal;
+  llmCalls: typeof llmCalls;
   menuActions: typeof menuActions;
   menus: typeof menus;
 }>;

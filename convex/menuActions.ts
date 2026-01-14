@@ -7,22 +7,49 @@
 
 import { v } from "convex/values";
 import { LIMITS } from "@/src/lib/constants";
+import type { LLMCallLogData } from "@/src/lib/llm-logger";
 import {
+  classifyDishType,
   extractMenuTheme,
   extractMenuWithVision,
   generateDishImage,
 } from "@/src/lib/openrouter";
-import { extractMenuArgsSchema, type MenuCategory } from "@/src/lib/validation";
+import {
+  extractMenuArgsSchema,
+  type MenuCategory,
+  type MenuPayload,
+} from "@/src/lib/validation";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalAction } from "./_generated/server";
 
+/**
+ * Validator for theme object passed to generateImagesParallel.
+ * Note: LLMs sometimes return null for optional fields, so we use
+ * v.optional(v.string()) which allows undefined. The theme extraction
+ * code in openrouter.ts already converts null to undefined.
+ */
 const menuThemeValidator = v.object({
   cuisineType: v.string(),
-  style: v.string(),
-  ambiance: v.string(),
-  colorPalette: v.optional(v.string()),
-  culturalContext: v.optional(v.string()),
+  cuisineSubtype: v.optional(v.string()),
+  presentationStyle: v.string(),
+  plateDescription: v.string(),
+  priceRange: v.union(
+    v.literal("budget"),
+    v.literal("mid-range"),
+    v.literal("upscale"),
+  ),
+  // Optional fields for enhanced prompt generation
+  surfaceMaterial: v.optional(v.string()),
+  lightingStyle: v.optional(
+    v.union(
+      v.literal("natural"),
+      v.literal("restaurant"),
+      v.literal("bright"),
+      v.literal("dramatic"),
+    ),
+  ),
+  colorPalette: v.optional(v.array(v.string())),
 });
 
 /**
@@ -31,8 +58,13 @@ const menuThemeValidator = v.object({
 function selectItemsForImageGeneration(
   categories: MenuCategory[],
   maxImages: number,
-): Array<{ key: string; name: string; description?: string }> {
-  const items: Array<{ key: string; name: string; description?: string }> = [];
+): Array<{ key: string; name: string; description?: string; price?: string }> {
+  const items: Array<{
+    key: string;
+    name: string;
+    description?: string;
+    price?: string;
+  }> = [];
 
   for (
     let catIndex = 0;
@@ -50,6 +82,7 @@ function selectItemsForImageGeneration(
         key: `cat:${catIndex}:item:${itemIndex}`,
         name: item.name,
         description: item.description,
+        price: item.price,
       });
     }
   }
@@ -68,21 +101,40 @@ export const extractMenuFromImage = action({
     args,
   ): Promise<{
     menuId: Id<"menus">;
-    menu: ReturnType<typeof extractMenuWithVision> extends Promise<infer T>
-      ? T
-      : never;
+    menu: MenuPayload;
   }> => {
     const { imageBase64 } = extractMenuArgsSchema.parse(args);
 
-    // Phase 1: Fast extraction
-    const menu = await extractMenuWithVision(imageBase64);
-    const theme = await extractMenuTheme(menu);
+    // Phase 1: Fast extraction with logging
+    const { result: menu, logData: menuLogData } = await extractMenuWithVision(
+      imageBase64,
+      { sessionId: args.sessionId },
+    );
+
+    const { result: theme, logData: themeLogData } = await extractMenuTheme(
+      menu,
+      { sessionId: args.sessionId },
+    );
 
     // Save menu immediately (without images)
     const { menuId } = await ctx.runMutation(internal.menus.saveMenuInternal, {
       sessionId: args.sessionId,
       menu,
     });
+
+    // Save LLM call logs
+    if (menuLogData) {
+      await ctx.runMutation(internal.llmCalls.saveLLMCall, {
+        ...menuLogData,
+        menuId,
+      });
+    }
+    if (themeLogData) {
+      await ctx.runMutation(internal.llmCalls.saveLLMCall, {
+        ...themeLogData,
+        menuId,
+      });
+    }
 
     // Schedule parallel image generation (runs in background)
     await ctx.scheduler.runAfter(
@@ -147,12 +199,25 @@ export const generateImagesParallel = internalAction({
             status: "generating",
           });
 
-          // Generate image
-          const imageUrl = await generateDishImage({
-            name: item.name,
-            description: item.description,
-            theme: args.theme,
-          });
+          // Classify dish type for better prompt generation
+          const dishType = classifyDishType(item.name, item.description);
+
+          // Generate image with dish type
+          const { result: imageUrl, logData } = await generateDishImage(
+            {
+              name: item.name,
+              description: item.description,
+              price: item.price,
+              theme: args.theme,
+              dishType,
+            },
+            { sessionId: args.sessionId, menuId: args.menuId },
+          );
+
+          // Save log
+          if (logData) {
+            await ctx.runMutation(internal.llmCalls.saveLLMCall, logData);
+          }
 
           // Update status to "completed" with URL
           await ctx.runMutation(internal.menus.updateImageStatus, {
@@ -166,6 +231,16 @@ export const generateImagesParallel = internalAction({
             `[generateImagesParallel] Error generating image for ${item.name}:`,
             error instanceof Error ? error.message : error,
           );
+
+          // Save the failure log if available
+          const errWithLog = error as { logData?: LLMCallLogData };
+          if (errWithLog.logData) {
+            await ctx.runMutation(
+              internal.llmCalls.saveLLMCall,
+              errWithLog.logData,
+            );
+          }
+
           // Update status to "failed"
           await ctx.runMutation(internal.menus.updateImageStatus, {
             menuId: args.menuId,

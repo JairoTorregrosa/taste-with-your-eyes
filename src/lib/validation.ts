@@ -7,30 +7,40 @@ import { z } from "zod";
 const nullToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((val) => (val === null ? undefined : val), schema);
 
-export const menuItemSchema = z.object({
-  name: z.string(),
-  description: nullToUndefined(z.string().optional()),
-  price: nullToUndefined(z.string().optional()),
-  confidence: nullToUndefined(z.number().optional()),
-  imageUrl: nullToUndefined(z.string().optional()),
-});
+export const menuItemSchema = z
+  .object({
+    name: z.string(),
+    description: nullToUndefined(z.string().optional()),
+    price: nullToUndefined(z.string().optional()),
+    imageUrl: nullToUndefined(z.string().optional()),
+  })
+  .strip(); // Explicitly strip unknown fields from LLM response
 
-export const menuCategorySchema = z.object({
-  name: z.string(),
-  items: z.array(menuItemSchema),
-});
+export const menuCategorySchema = z
+  .object({
+    name: z.preprocess(
+      (val) => (val === null || val === undefined ? "Other" : val),
+      z.string(),
+    ),
+    items: z.array(menuItemSchema),
+  })
+  .strip();
 
-export const menuBrandingSchema = z.object({
-  primaryColor: nullToUndefined(z.string().optional()),
-  accentColor: nullToUndefined(z.string().optional()),
-});
+export const menuBrandingSchema = z
+  .object({
+    primaryColor: nullToUndefined(z.string().optional()),
+    accentColor: nullToUndefined(z.string().optional()),
+  })
+  .strip();
 
-export const menuPayloadSchema = z.object({
-  restaurantName: nullToUndefined(z.string().optional()),
-  branding: nullToUndefined(menuBrandingSchema.optional()),
-  categories: z.array(menuCategorySchema),
-  imageBase64: nullToUndefined(z.string().optional()),
-});
+export const menuPayloadSchema = z
+  .object({
+    restaurantName: nullToUndefined(z.string().optional()),
+    branding: nullToUndefined(menuBrandingSchema.optional()),
+    categories: z.array(menuCategorySchema),
+    imageBase64: nullToUndefined(z.string().optional()),
+  })
+  .strip();
 
 export const extractMenuArgsSchema = z.object({
   sessionId: z.string(),

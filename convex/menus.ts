@@ -1,6 +1,7 @@
 /**
  * Convex mutations and queries for menu management.
  * Actions that require Node.js are in menuActions.ts.
+ * @version 2.0.0 - Simplified schema (no tags/confidence/imageAlt)
  */
 
 import { v } from "convex/values";
@@ -17,9 +18,7 @@ const menuItemValidator = v.object({
   name: v.string(),
   description: v.optional(v.string()),
   price: v.optional(v.string()),
-  confidence: v.optional(v.float64()),
   imageUrl: v.optional(v.string()),
-  imageAlt: v.optional(v.string()),
 });
 
 const menuCategoryValidator = v.object({
@@ -49,7 +48,6 @@ function truncateMenuData(
         name: string;
         description?: string;
         price?: string;
-        confidence?: number;
       }>;
     }>;
   },
@@ -65,7 +63,6 @@ function truncateMenuData(
       ...cat,
       name: cat.name.slice(0, 40),
       items: cat.items.slice(0, maxItemsPerCategory).map((item) => ({
-        ...item,
         name: item.name.slice(0, 60),
         description: item.description
           ? item.description.slice(0, 120)
@@ -87,7 +84,6 @@ function truncateMenuData(
         name: string;
         description?: string;
         price?: string;
-        confidence?: number;
       };
     }> = [];
     for (let i = 0; i < truncated.categories.length; i++) {
@@ -103,7 +99,6 @@ function truncateMenuData(
         name: string;
         description?: string;
         price?: string;
-        confidence?: number;
       }>;
     }> = truncated.categories.map((cat) => ({ name: cat.name, items: [] }));
     for (const { categoryIndex, item } of limitedItems) {
