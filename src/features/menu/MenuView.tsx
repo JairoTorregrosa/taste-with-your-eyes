@@ -1,10 +1,10 @@
 "use client";
 
-import type { MenuPayload } from "@/src/lib/validation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, RefreshCw, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import type { MenuPayload } from "@/src/lib/validation";
 
 type Props = {
   menu: MenuPayload;
@@ -267,8 +267,9 @@ const DishCard = ({
           </AnimatePresence>
 
           <motion.div
-            className={`relative h-full w-full transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"
-              }`}
+            className={`relative h-full w-full transition-opacity duration-500 ${
+              imageLoaded ? "opacity-100" : "opacity-0"
+            }`}
           >
             <Image
               src={imageUrl}

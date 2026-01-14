@@ -1,38 +1,31 @@
 "use client";
 
-import {
-  ConvexProvider,
-  ConvexReactClient,
-  useAction,
-  useMutation,
-  useQuery,
-} from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { ConvexClientProvider, ErrorBoundary } from "@/src/components/shared";
 import { ErrorBanner } from "@/src/features/menu/ErrorBanner";
 import { HeroSection } from "@/src/features/menu/HeroSection";
 import { LoadingState } from "@/src/features/menu/LoadingState";
 import { MenuView } from "@/src/features/menu/MenuView";
+import { STORAGE_KEYS } from "@/src/lib/constants";
 import type { MenuPayload } from "@/src/lib/validation";
 
 type FlowState = "idle" | "processing" | "done";
 
-interface MenuPageProps {
+export interface MenuPageProps {
   convexUrl: string;
 }
 
 export function MenuPage({ convexUrl }: MenuPageProps) {
-  const convexClient = useMemo(
-    () => new ConvexReactClient(convexUrl),
-    [convexUrl],
-  );
-
   return (
-    <ConvexProvider client={convexClient}>
-      <PageContent />
-    </ConvexProvider>
+    <ErrorBoundary>
+      <ConvexClientProvider convexUrl={convexUrl}>
+        <PageContent />
+      </ConvexClientProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -55,11 +48,11 @@ function PageContent() {
   );
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("twye_session");
+    const stored = window.localStorage.getItem(STORAGE_KEYS.SESSION);
     const sid = stored || crypto.randomUUID();
-    window.localStorage.setItem("twye_session", sid);
+    window.localStorage.setItem(STORAGE_KEYS.SESSION, sid);
     setSessionId(sid);
-    const menuId = window.localStorage.getItem("twye_menu_id");
+    const menuId = window.localStorage.getItem(STORAGE_KEYS.MENU_ID);
     if (menuId) setSavedId(menuId);
   }, []);
 
@@ -97,7 +90,7 @@ function PageContent() {
         const result = await saveMenu({ sessionId, menu: menuToSave });
         if (result?.id) {
           setSavedId(result.id);
-          window.localStorage.setItem("twye_menu_id", result.id);
+          window.localStorage.setItem(STORAGE_KEYS.MENU_ID, result.id);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save menu");
@@ -113,7 +106,7 @@ function PageContent() {
     setError(null);
     setStatus("idle");
     setSavedId(null);
-    window.localStorage.removeItem("twye_menu_id");
+    window.localStorage.removeItem(STORAGE_KEYS.MENU_ID);
 
     // Scroll back to top
     window.scrollTo({ top: 0, behavior: "smooth" });

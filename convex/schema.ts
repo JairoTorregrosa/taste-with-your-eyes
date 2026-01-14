@@ -3,7 +3,11 @@ import { v } from "convex/values";
 
 export default defineSchema({
   menus: defineTable({
+    // Identity
     sessionId: v.string(),
+    userId: v.optional(v.string()), // Future: Convex Auth user ID
+
+    // Content
     restaurantName: v.optional(v.string()),
     branding: v.optional(
       v.object({
@@ -21,10 +25,13 @@ export default defineSchema({
             price: v.optional(v.string()),
             confidence: v.optional(v.float64()),
             imageUrl: v.optional(v.string()),
+            imageAlt: v.optional(v.string()), // Accessibility
           }),
         ),
       }),
     ),
+
+    // Metadata
     totalItems: v.float64(),
     totalCategories: v.float64(),
     hasRestaurantName: v.boolean(),
@@ -33,7 +40,6 @@ export default defineSchema({
     updatedAt: v.float64(),
   })
     .index("by_session", ["sessionId"])
-    .index("by_created_at", ["createdAt"])
-    .index("by_restaurant", ["restaurantName"])
-    .index("by_has_restaurant", ["hasRestaurantName"]),
+    .index("by_created_at", ["createdAt"]),
+  // Removed unused indexes: by_restaurant, by_has_restaurant
 });

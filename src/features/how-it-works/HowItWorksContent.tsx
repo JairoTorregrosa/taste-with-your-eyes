@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Camera, Sparkles, Utensils } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 const containerVariants = {
   hidden: { opacity: 0 },
